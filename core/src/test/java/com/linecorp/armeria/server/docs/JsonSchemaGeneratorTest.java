@@ -16,12 +16,17 @@
 
 package com.linecorp.armeria.server.docs;
 
+import static java.util.Objects.requireNonNull;
 import static net.javacrumbs.jsonunit.fluent.JsonFluentAssert.assertThatJson;
+import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import com.fasterxml.jackson.annotation.JsonSubTypes;
+import com.fasterxml.jackson.annotation.JsonTypeInfo;
+import com.linecorp.armeria.common.MediaType;
 import org.hamcrest.CustomTypeSafeMatcher;
 import org.junit.jupiter.api.Test;
 
@@ -162,4 +167,211 @@ class JsonSchemaGeneratorTest {
         assertThatJson(jsonSchema).node("properties.paramRecursive.properties.inner-recurse.$ref").isEqualTo(
                 "#/properties/paramRecursive");
     }
+
+
+
+
+    /**
+     * A top-level interface for all animals in the test, defining the polymorphism contract.
+     */
+    @JsonTypeInfo(
+            use = JsonTypeInfo.Id.NAME,
+            property = "species"
+    )
+    @JsonSubTypes({
+            @JsonSubTypes.Type(value = Dog.class, name = "dog"),
+            @JsonSubTypes.Type(value = Cat.class, name = "cat")
+    })
+    interface Animal {
+        String name();
+    }
+
+    /**
+     * An abstract class for mammals, providing common properties.
+     */
+    abstract static class Mammal implements Animal {
+        private final String name;
+
+        protected Mammal(String name) {
+            this.name = requireNonNull(name, "name");
+        }
+
+        @Override
+        public String name() {
+            return name;
+        }
+
+        /**
+         * Returns the sound this mammal makes.
+         */
+        public abstract String sound();
+    }
+
+    /**
+     * A simple DTO representing a toy, used as a nested object.
+     */
+    static final class Toy {
+        private final String toyName;
+        private final String color;
+
+        Toy(String toyName, String color) {
+            this.toyName = requireNonNull(toyName, "toyName");
+            this.color = requireNonNull(color, "color");
+        }
+
+        public String toyName() {
+            return toyName;
+        }
+
+        public String color() {
+            return color;
+        }
+    }
+
+    /**
+     * A concrete implementation representing a Dog.
+     */
+    static final class Dog extends Mammal {
+        private final int age;
+        private final String[] favoriteFoods;
+        private final Toy favoriteToy;
+
+        Dog(String name, int age, String[] favoriteFoods, Toy favoriteToy) {
+            super(name);
+            this.age = age;
+            this.favoriteFoods = requireNonNull(favoriteFoods, "favoriteFoods");
+            this.favoriteToy = requireNonNull(favoriteToy, "favoriteToy");
+        }
+
+        @Override
+        public String sound() {
+            return "woof woof";
+        }
+
+        public int age() {
+            return age;
+        }
+
+        public String[] favoriteFoods() {
+            return favoriteFoods;
+        }
+
+        public Toy favoriteToy() {
+            return favoriteToy;
+        }
+    }
+
+    /**
+     * A concrete implementation representing a Cat.
+     */
+    static final class Cat extends Mammal {
+        private final boolean likesTuna;
+
+        Cat(String name, boolean likesTuna) {
+            super(name);
+            this.likesTuna = likesTuna;
+        }
+
+        @Override
+        public String sound() {
+            return "meow meow";
+        }
+
+        public boolean likesTuna() {
+            return likesTuna;
+        }
+    }
+
+
+
+    /**
+     * Verifies that the JSON schema for a polymorphic type is correctly generated
+     * with 'oneOf' and 'discriminator' properties according to the OpenAPI 3.0 specification.
+     */
+    @Test
+    void shouldGenerateOneOfForPolymorphicType() {
+        // 1. Arrange (Given): Build the ServiceSpecification manually.
+        final StructInfo toyInfo = new StructInfo(
+                Toy.class.getName(),
+                ImmutableList.of(
+                        FieldInfo.of("toyName", TypeSignature.ofBase("string")),
+                        FieldInfo.of("color", TypeSignature.ofBase("string"))
+                )
+        );
+
+        final StructInfo dogInfo = new StructInfo(
+                Dog.class.getName(),
+                ImmutableList.of(
+                        FieldInfo.of("name", TypeSignature.ofBase("string")),
+                        FieldInfo.of("sound", TypeSignature.ofBase("string")),
+                        FieldInfo.of("age", TypeSignature.ofBase("int")),
+                        FieldInfo.of("favoriteFoods", TypeSignature.ofList(TypeSignature.ofBase("string"))),
+                        FieldInfo.of("favoriteToy", TypeSignature.ofStruct(Toy.class))
+                )
+        );
+
+        final StructInfo catInfo = new StructInfo(
+                Cat.class.getName(),
+                ImmutableList.of(
+                        FieldInfo.of("name", TypeSignature.ofBase("string")),
+                        FieldInfo.of("sound", TypeSignature.ofBase("string")),
+                        FieldInfo.of("likesTuna", TypeSignature.ofBase("boolean"))
+                )
+        );
+
+        // The current system doesn't know the relationship between Animal, Dog, and Cat.
+        final StructInfo animalInfo = new StructInfo(
+                Animal.class.getName(),
+                ImmutableList.of(FieldInfo.of("name", TypeSignature.ofBase("string")))
+        );
+
+        final EndpointInfo endpoint = EndpointInfo.builder("*", "/test-polymorphism")
+                .defaultMimeType(MediaType.JSON_UTF_8).build();
+
+        final MethodInfo testMethod = new MethodInfo(
+                "animal-service",                                                                 // serviceName
+                "animalMethod",                                                                   // name
+                0,                                                                              // overloadId
+                TypeSignature.ofBase("void"),                                                  // returnType
+                ImmutableList.of(FieldInfo.of("animal", TypeSignature.ofStruct(Animal.class))), // parameters
+                ImmutableList.of(),                                                             // exampleHeaders
+                ImmutableList.of(endpoint),                                                     // endpoints
+                HttpMethod.POST,                                                                // httpMethod
+                DescriptionInfo.empty()                                                         // descriptionInfo
+        );
+
+        final ServiceSpecification specification = new ServiceSpecification(
+                ImmutableList.of(new ServiceInfo("test-service", ImmutableList.of(testMethod))),
+                ImmutableList.of(), // enums
+                ImmutableList.of(animalInfo, dogInfo, catInfo, toyInfo), // all structs
+                ImmutableList.of()  // exceptions
+        );
+
+        // 2. Act (When): Generate the JSON schema.
+        final JsonNode jsonSchema = JsonSchemaGenerator.generate(specification);
+
+        // 3. Assert (Then): Verify the generated schema.
+        final JsonNode animalSchema = findSchema(jsonSchema, Animal.class.getName());
+        assertThat(animalSchema).isNotNull();
+
+        // This is the part that will FAIL.
+        assertThatJson(animalSchema).node("oneOf").isArray().ofLength(2);
+        assertThatJson(animalSchema).node("oneOf[0].$ref")
+                .isEqualTo("#/definitions/" + Dog.class.getName());
+        assertThatJson(animalSchema).node("oneOf[1].$ref")
+                .isEqualTo("#/definitions/" + Cat.class.getName());
+
+        assertThatJson(animalSchema).node("discriminator.propertyName").isEqualTo("species");
+    }
+
+    private static JsonNode findSchema(JsonNode jsonSchema, String name) {
+        for (JsonNode schema : jsonSchema) {
+            if (schema.get("title").asText().equals(name)) {
+                return schema;
+            }
+        }
+        return null;
+    }
+
+
 }
