@@ -5,7 +5,7 @@
  * version 2.0 (the "License"); you may not use this file except in compliance
  * with the License. You may obtain a copy of the License at:
  *
- *   https://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
@@ -46,29 +46,46 @@ public final class StructInfo implements DescriptiveTypeInfo {
     private final List<FieldInfo> fields;
     private final DescriptionInfo descriptionInfo;
 
+    private final List<TypeSignature> oneOf;
+    @Nullable
+    private final DiscriminatorInfo discriminator;
+
     /**
      * Creates a new instance.
      */
     public StructInfo(String name, Iterable<FieldInfo> fields) {
-        this(name, null, fields, DescriptionInfo.empty());
+        this(name, null, fields, DescriptionInfo.empty(), ImmutableList.of(), null);
     }
 
     /**
      * Creates a new instance.
      */
     public StructInfo(String name, Iterable<FieldInfo> fields, DescriptionInfo descriptionInfo) {
-        this(name, null, fields, descriptionInfo);
+        this(name, null, fields, descriptionInfo, ImmutableList.of(), null);
+    }
+
+    /**
+     * Creates a new instance.
+     * @deprecated Use {@link #StructInfo(String, String, Iterable, DescriptionInfo, Iterable, DiscriminatorInfo)}.
+     */
+    @Deprecated
+    public StructInfo(String name, @Nullable String alias, Iterable<FieldInfo> fields,
+                      DescriptionInfo descriptionInfo) {
+        this(name, alias, fields, descriptionInfo, ImmutableList.of(), null);
     }
 
     /**
      * Creates a new instance.
      */
     public StructInfo(String name, @Nullable String alias, Iterable<FieldInfo> fields,
-                      DescriptionInfo descriptionInfo) {
+                      DescriptionInfo descriptionInfo, Iterable<TypeSignature> oneOf,
+                      @Nullable DiscriminatorInfo discriminator) {
         this.name = requireNonNull(name, "name");
         this.alias = alias;
         this.fields = ImmutableList.copyOf(requireNonNull(fields, "fields"));
         this.descriptionInfo = requireNonNull(descriptionInfo, "descriptionInfo");
+        this.oneOf = ImmutableList.copyOf(requireNonNull(oneOf, "oneOf"));
+        this.discriminator = discriminator;
     }
 
     @Override
@@ -76,15 +93,6 @@ public final class StructInfo implements DescriptiveTypeInfo {
         return name;
     }
 
-    /**
-     * Returns the alias of the {@link #name()}.
-     * An alias could be set when a {@link StructInfo} has two different names.
-     *
-     * <p>For example, if a {@link StructInfo} is extracted from a {@code com.google.protobuf.Message},
-     * the {@link StructInfo#name()} is set to the full name defined in the proto file and the
-     * {@link StructInfo#alias()} is set to the {@linkplain Class#getName() name} of the generated
-     * {@link Class}.
-     */
     @Nullable
     @JsonInclude(Include.NON_NULL)
     @JsonProperty
@@ -92,66 +100,66 @@ public final class StructInfo implements DescriptiveTypeInfo {
         return alias;
     }
 
-    /**
-     * Returns a new {@link StructInfo} with the specified {@code alias}.
-     * Returns {@code this} if this {@link StructInfo} has the same {@link FieldInfo}s.
-     */
     public StructInfo withAlias(String alias) {
         requireNonNull(alias, "alias");
         if (alias.equals(this.alias)) {
             return this;
         }
-
-        return new StructInfo(name, alias, fields, descriptionInfo);
+        return new StructInfo(name, alias, fields, descriptionInfo, oneOf, discriminator);
     }
 
-    /**
-     * Returns the metadata about the fields of the type.
-     */
     @JsonProperty
     public List<FieldInfo> fields() {
         return fields;
     }
 
-    /**
-     * Returns a new {@link StructInfo} with the specified {@link FieldInfo}s.
-     * Returns {@code this} if this {@link StructInfo} has the same {@link FieldInfo}s.
-     */
     public StructInfo withFields(Iterable<FieldInfo> fields) {
         requireNonNull(fields, "fields");
         if (fields.equals(this.fields)) {
             return this;
         }
-
-        return new StructInfo(name, alias, fields, descriptionInfo);
+        return new StructInfo(name, alias, fields, descriptionInfo, oneOf, discriminator);
     }
 
-    /**
-     * Returns the description information of this struct.
-     */
     @JsonProperty
     @Override
     public DescriptionInfo descriptionInfo() {
         return descriptionInfo;
     }
 
-    /**
-     * Returns a new {@link StructInfo} with the specified {@link DescriptionInfo}.
-     * Returns {@code this} if this {@link StructInfo} has the same {@link DescriptionInfo}.
-     */
     public StructInfo withDescriptionInfo(DescriptionInfo descriptionInfo) {
         requireNonNull(descriptionInfo, "descriptionInfo");
         if (descriptionInfo.equals(this.descriptionInfo)) {
             return this;
         }
+        return new StructInfo(name, alias, fields, descriptionInfo, oneOf, discriminator);
+    }
 
-        return new StructInfo(name, alias, fields, descriptionInfo);
+
+    /**
+     * Returns the list of subtypes for polymorphism.
+     */
+    @JsonProperty
+    @JsonInclude(Include.NON_EMPTY)
+    public List<TypeSignature> oneOf() {
+        return oneOf;
+    }
+
+    /**
+     * Returns the discriminator information for polymorphism.
+     */
+    @JsonProperty
+    @JsonInclude(Include.NON_NULL)
+    @Nullable
+    public DiscriminatorInfo discriminator() {
+        return discriminator;
     }
 
     @Override
     public Set<DescriptiveTypeSignature> findDescriptiveTypes() {
         final Set<DescriptiveTypeSignature> collectedDescriptiveTypes = new HashSet<>();
         fields().forEach(f -> ServiceInfo.findDescriptiveTypes(collectedDescriptiveTypes, f.typeSignature()));
+        oneOf().forEach(t -> ServiceInfo.findDescriptiveTypes(collectedDescriptiveTypes, t)); // oneOf 타입 추가
         return ImmutableSortedSet.copyOf(comparing(TypeSignature::name), collectedDescriptiveTypes);
     }
 
@@ -160,31 +168,33 @@ public final class StructInfo implements DescriptiveTypeInfo {
         if (this == o) {
             return true;
         }
-
         if (!(o instanceof StructInfo)) {
             return false;
         }
-
         final StructInfo that = (StructInfo) o;
         return name.equals(that.name) &&
-               Objects.equals(alias, that.alias) &&
-               fields.equals(that.fields) &&
-               descriptionInfo.equals(that.descriptionInfo);
+                Objects.equals(alias, that.alias) &&
+                fields.equals(that.fields) &&
+                descriptionInfo.equals(that.descriptionInfo) &&
+                oneOf.equals(that.oneOf) &&
+                Objects.equals(discriminator, that.discriminator);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(name, alias, fields, descriptionInfo);
+        return Objects.hash(name, alias, fields, descriptionInfo, oneOf, discriminator);
     }
 
     @Override
     public String toString() {
         return MoreObjects.toStringHelper(this)
-                          .omitNullValues()
-                          .add("name", name)
-                          .add("alias", alias)
-                          .add("fields", fields)
-                          .add("descriptionInfo", descriptionInfo)
-                          .toString();
+                .omitNullValues()
+                .add("name", name)
+                .add("alias", alias)
+                .add("fields", fields)
+                .add("descriptionInfo", descriptionInfo)
+                .add("oneOf", oneOf.isEmpty() ? null : oneOf)
+                .add("discriminator", discriminator)
+                .toString();
     }
 }
