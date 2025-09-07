@@ -13,10 +13,11 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-package com.linecorp.armeria.server.docs;
+package com.linecorp.armeria.internal.server.docs;
 
+import static com.google.common.base.Strings.isNullOrEmpty;
 import static com.google.common.collect.ImmutableList.toImmutableList;
-import static com.linecorp.armeria.server.docs.DocServiceTypeUtil.toTypeSignature;
+import static com.linecorp.armeria.internal.server.docs.DocServiceTypeUtil.toTypeSignature;
 import static java.util.Objects.requireNonNull;
 
 import java.util.Arrays;
@@ -34,6 +35,13 @@ import com.fasterxml.jackson.databind.introspect.BeanPropertyDefinition;
 import com.linecorp.armeria.common.annotation.Nullable;
 import com.linecorp.armeria.internal.common.JacksonUtil;
 import com.linecorp.armeria.server.annotation.Description;
+import com.linecorp.armeria.server.docs.DescriptionInfo;
+import com.linecorp.armeria.server.docs.DescriptiveTypeInfo;
+import com.linecorp.armeria.server.docs.DescriptiveTypeInfoProvider;
+import com.linecorp.armeria.server.docs.DiscriminatorInfo;
+import com.linecorp.armeria.server.docs.FieldInfo;
+import com.linecorp.armeria.server.docs.StructInfo;
+import com.linecorp.armeria.server.docs.TypeSignature;
 
 /**
  * A {@link DescriptiveTypeInfoProvider} that provides {@link DescriptiveTypeInfo} for a polymorphic
@@ -75,16 +83,20 @@ public final class JacksonPolymorphismTypeInfoProvider implements DescriptiveTyp
             return null;
         }
 
+        if (jsonSubTypes.value().length == 0) {
+            //if there are no subTypes, return null
+            return null;
+        }
+
         final Map<String, String> mapping = new LinkedHashMap<>();
         Arrays.stream(jsonSubTypes.value()).forEach(subType -> {
             final Class<?> subClass = subType.value();
-            final String key = subType.name() == null || subType.name().isEmpty() ?
-                               subClass.getSimpleName() : subType.name();
+            final String key = isNullOrEmpty(subType.name()) ? subClass.getSimpleName() : subType.name();
             final String schemaName = TypeSignature.ofStruct(subClass).name();
             mapping.put(key, "#/definitions/" + schemaName);
         });
 
-        final DiscriminatorInfo discriminator = new DiscriminatorInfo(propertyName, mapping);
+        final DiscriminatorInfo discriminator = DiscriminatorInfo.of(propertyName, mapping);
 
         final List<TypeSignature> oneOf =
                 Arrays.stream(jsonSubTypes.value())

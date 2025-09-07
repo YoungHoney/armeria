@@ -13,7 +13,7 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-package com.linecorp.armeria.server.docs;
+package com.linecorp.armeria.internal.server.docs;
 
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static java.util.Objects.requireNonNull;
@@ -33,7 +33,8 @@ import java.util.stream.Stream;
 import com.fasterxml.jackson.databind.JavaType;
 import com.google.common.annotations.VisibleForTesting;
 
-import com.linecorp.armeria.common.annotation.UnstableApi;
+import com.linecorp.armeria.server.docs.DocService;
+import com.linecorp.armeria.server.docs.TypeSignature;
 
 import io.netty.buffer.ByteBuf;
 
@@ -43,7 +44,6 @@ import io.netty.buffer.ByteBuf;
  * This class centralizes the logic for interpreting various Java and Jackson types
  * and mapping them to the standardized documentation model.
  */
-@UnstableApi
 public final class DocServiceTypeUtil {
 
     @VisibleForTesting

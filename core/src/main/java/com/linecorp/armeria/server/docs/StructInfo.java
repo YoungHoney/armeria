@@ -225,14 +225,21 @@ public final class StructInfo implements DescriptiveTypeInfo {
 
     @Override
     public String toString() {
-        return MoreObjects.toStringHelper(this)
-                          .omitNullValues()
-                          .add("name", name)
-                          .add("alias", alias)
-                          .add("fields", fields)
-                          .add("descriptionInfo", descriptionInfo)
-                          .add("oneOf",oneOf.isEmpty() ? null : oneOf)
-                          .add("discriminator", discriminator)
-                          .toString();
+        final MoreObjects.ToStringHelper stringHelper =
+                MoreObjects.toStringHelper(this)
+                           .add("name", name)
+                           .add("alias", alias)
+                           .add("fields", fields)
+                           .add("descriptionInfo", descriptionInfo);
+
+        if (!oneOf.isEmpty()) {
+            stringHelper.add("oneOf", oneOf);
+        }
+
+        if (discriminator != null) {
+            stringHelper.add("discriminator", discriminator);
+        }
+
+        return stringHelper.toString();
     }
 }

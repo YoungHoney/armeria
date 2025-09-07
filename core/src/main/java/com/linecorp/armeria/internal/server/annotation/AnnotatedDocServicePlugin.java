@@ -21,7 +21,7 @@ import static com.linecorp.armeria.internal.server.annotation.KotlinUtil.isKFunc
 import static com.linecorp.armeria.internal.server.annotation.KotlinUtil.isReturnTypeNothing;
 import static com.linecorp.armeria.internal.server.annotation.KotlinUtil.kFunctionGenericReturnType;
 import static com.linecorp.armeria.internal.server.annotation.KotlinUtil.kFunctionReturnType;
-import static com.linecorp.armeria.server.docs.DocServiceTypeUtil.toTypeSignature;
+import static com.linecorp.armeria.internal.server.docs.DocServiceTypeUtil.toTypeSignature;
 import static com.linecorp.armeria.server.docs.FieldLocation.HEADER;
 import static com.linecorp.armeria.server.docs.FieldLocation.PATH;
 import static com.linecorp.armeria.server.docs.FieldLocation.QUERY;

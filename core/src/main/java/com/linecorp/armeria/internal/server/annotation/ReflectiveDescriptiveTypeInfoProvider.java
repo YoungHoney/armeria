@@ -18,7 +18,7 @@ package com.linecorp.armeria.internal.server.annotation;
 
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.linecorp.armeria.internal.server.annotation.DefaultDescriptiveTypeInfoProvider.isNullable;
-import static com.linecorp.armeria.server.docs.DocServiceTypeUtil.toTypeSignature;
+import static com.linecorp.armeria.internal.server.docs.DocServiceTypeUtil.toTypeSignature;
 
 import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.Field;

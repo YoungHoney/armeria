@@ -36,6 +36,7 @@ import com.google.common.collect.ImmutableList;
 import com.linecorp.armeria.common.HttpMethod;
 import com.linecorp.armeria.common.MediaType;
 import com.linecorp.armeria.internal.server.annotation.DocServiceTestUtil;
+import com.linecorp.armeria.internal.server.docs.JacksonPolymorphismTypeInfoProvider;
 
 class JsonSchemaGeneratorTest {
     private static final String methodName = "test-method";

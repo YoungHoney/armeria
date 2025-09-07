@@ -23,10 +23,10 @@ import static com.linecorp.armeria.internal.server.annotation.AnnotatedDocServic
 import static com.linecorp.armeria.internal.server.annotation.AnnotatedDocServicePlugin.newDescriptiveTypeInfo;
 import static com.linecorp.armeria.internal.server.annotation.DefaultDescriptiveTypeInfoProviderTest.REQUEST_STRUCT_INFO_PROVIDER;
 import static com.linecorp.armeria.internal.server.docs.DocServiceUtil.unifyFilter;
-import static com.linecorp.armeria.server.docs.DocServiceTypeUtil.LONG;
-import static com.linecorp.armeria.server.docs.DocServiceTypeUtil.STRING;
-import static com.linecorp.armeria.server.docs.DocServiceTypeUtil.VOID;
-import static com.linecorp.armeria.server.docs.DocServiceTypeUtil.toTypeSignature;
+import static com.linecorp.armeria.internal.server.docs.DocServiceTypeUtil.LONG;
+import static com.linecorp.armeria.internal.server.docs.DocServiceTypeUtil.STRING;
+import static com.linecorp.armeria.internal.server.docs.DocServiceTypeUtil.VOID;
+import static com.linecorp.armeria.internal.server.docs.DocServiceTypeUtil.toTypeSignature;
 import static com.linecorp.armeria.server.docs.FieldLocation.HEADER;
 import static com.linecorp.armeria.server.docs.FieldLocation.QUERY;
 import static com.linecorp.armeria.server.docs.FieldRequirement.REQUIRED;

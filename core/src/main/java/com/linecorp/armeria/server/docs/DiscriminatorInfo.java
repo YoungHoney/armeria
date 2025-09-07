@@ -39,13 +39,18 @@ public final class DiscriminatorInfo {
     private final Map<String, String> mapping;
 
     /**
-     * Creates a new instance.
-     *
-     * @param propertyName the name of the property in the payload that will be used to differentiate
-     *     between schemas.
-     * @param mapping a map of payload values to schema names or references.
+     * Creates a new {@link DiscriminatorInfo} with {@code propertyName}, the name of the property
+     * int the payload that will be used to differentiate between schemas.
+     * and {@code mapping} a map of payload values to schema names or references.
      */
-    public DiscriminatorInfo(String propertyName, Map<String, String> mapping) {
+    public static DiscriminatorInfo of(String propertyName, Map<String, String> mapping) {
+        return new DiscriminatorInfo(propertyName, mapping);
+    }
+
+    /**
+     * Creates a new instance.
+     */
+    DiscriminatorInfo(String propertyName, Map<String, String> mapping) {
         this.propertyName = requireNonNull(propertyName, "propertyName");
         this.mapping = ImmutableMap.copyOf(requireNonNull(mapping, "mapping"));
     }

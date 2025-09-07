@@ -17,10 +17,10 @@
 package com.linecorp.armeria.internal.server.annotation;
 
 import static com.linecorp.armeria.internal.server.annotation.AnnotatedDocServicePluginTest.compositeBean;
-import static com.linecorp.armeria.server.docs.DocServiceTypeUtil.INT;
-import static com.linecorp.armeria.server.docs.DocServiceTypeUtil.LONG;
-import static com.linecorp.armeria.server.docs.DocServiceTypeUtil.STRING;
-import static com.linecorp.armeria.server.docs.DocServiceTypeUtil.toTypeSignature;
+import static com.linecorp.armeria.internal.server.docs.DocServiceTypeUtil.INT;
+import static com.linecorp.armeria.internal.server.docs.DocServiceTypeUtil.LONG;
+import static com.linecorp.armeria.internal.server.docs.DocServiceTypeUtil.STRING;
+import static com.linecorp.armeria.internal.server.docs.DocServiceTypeUtil.toTypeSignature;
 import static com.linecorp.armeria.server.docs.FieldLocation.PATH;
 import static com.linecorp.armeria.server.docs.FieldLocation.QUERY;
 import static com.linecorp.armeria.server.docs.FieldRequirement.REQUIRED;

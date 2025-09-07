@@ -1,1 +1,1 @@
-com.linecorp.armeria.server.docs.JacksonPolymorphismTypeInfoProvider
+com.linecorp.armeria.internal.server.docs.JacksonPolymorphismTypeInfoProvider

@@ -18,19 +18,14 @@ package com.linecorp.armeria.server.docs;
 import static com.google.common.collect.ImmutableMap.toImmutableMap;
 import static java.util.Objects.requireNonNull;
 
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableSet;
 
 import com.linecorp.armeria.common.annotation.Nullable;
 import com.linecorp.armeria.internal.common.JacksonUtil;
@@ -41,7 +36,6 @@ import com.linecorp.armeria.internal.common.JacksonUtil;
  * @see <a href="https://json-schema.org/">JSON Schema</a>
  */
 final class JsonSchemaGenerator {
-    private static final Logger logger = LoggerFactory.getLogger(JsonSchemaGenerator.class);
     private static final ObjectMapper mapper = JacksonUtil.newDefaultObjectMapper();
 
     private final ServiceSpecification serviceSpecification;
@@ -120,11 +114,11 @@ final class JsonSchemaGenerator {
 
     // Renamed private instance method that does the actual work
     private ArrayNode doGenerate() {
-        final ObjectNode definitions = generateDefinitions(); // 항상 생성
+        final ObjectNode definitions = generateDefinitions();
         final ArrayNode methodSchemas = mapper.createArrayNode();
         for (final ServiceInfo svc : serviceSpecification.services()) {
             for (final MethodInfo m : svc.methods()) {
-                final ObjectNode schema = generateMethodSchema(m, definitions); // 항상 전달
+                final ObjectNode schema = generateMethodSchema(m, definitions);
                 methodSchemas.add(schema);
             }
         }
@@ -147,12 +141,12 @@ final class JsonSchemaGenerator {
         schemaNode.put("type", "object");
         schemaNode.put("title", structInfo.name());
         final String docString = structInfo.descriptionInfo().docString();
-        if (docString != null && !docString.isEmpty()) {
+        if (!docString.isEmpty()) {
             schemaNode.put("description", docString);
         }
 
         final List<TypeSignature> oneOf = structInfo.oneOf();
-        if (oneOf != null && !oneOf.isEmpty()) {
+        if (!oneOf.isEmpty()) {
             final ArrayNode oneOfNode = schemaNode.putArray("oneOf");
             oneOf.forEach(sub -> {
                 final ObjectNode ref = mapper.createObjectNode();
@@ -164,33 +158,32 @@ final class JsonSchemaGenerator {
             if (discriminator != null) {
                 final ObjectNode disc = schemaNode.putObject("discriminator");
                 disc.put("propertyName", discriminator.propertyName());
-                if (discriminator.mapping() != null && !discriminator.mapping().isEmpty()) {
+                if (!discriminator.mapping().isEmpty()) {
                     final ObjectNode mapping = disc.putObject("mapping");
                     discriminator.mapping().forEach(mapping::put);
                 }
             }
-            return schemaNode; // oneOf면 properties/required는 생략
+            return schemaNode;
         }
 
-        // 일반 struct
         final ObjectNode props = mapper.createObjectNode();
         final ArrayNode required = mapper.createArrayNode();
         for (final FieldInfo field : structInfo.fields()) {
-            props.set(field.name(), generateFieldSchema(field, /*useDefinitions=*/true));
+            props.set(field.name(), generateFieldSchema(field));
             if (field.requirement() == FieldRequirement.REQUIRED) {
                 required.add(field.name());
             }
         }
-        if (props.size() > 0) {
+        if (!props.isEmpty()) {
             schemaNode.set("properties", props);
         }
-        if (required.size() > 0) {
+        if (!required.isEmpty()) {
             schemaNode.set("required", required);
         }
         return schemaNode;
     }
 
-    private ObjectNode generateEnumDefinition(EnumInfo enumInfo) {
+    private static ObjectNode generateEnumDefinition(EnumInfo enumInfo) {
         final ObjectNode schemaNode = mapper.createObjectNode();
         schemaNode.put("type", "string");
         final ArrayNode enumValues = mapper.createArrayNode();
@@ -199,84 +192,58 @@ final class JsonSchemaGenerator {
         return schemaNode;
     }
 
-    private boolean useDefinitions(MethodInfo methodInfo) {
-        // Heuristic: gRPC services usually have one parameter and represent the unpacked message.
-        // Annotated services have multiple parameters or one that isn't a known struct.
-        if (methodInfo.parameters().size() == 1) {
-            final FieldInfo firstParam = methodInfo.parameters().get(0);
-            return structs.get(firstParam.typeSignature().signature()) == null;
-        }
-        return methodInfo.parameters().size() > 1 || methodInfo.parameters().isEmpty();
-    }
-
-    private ObjectNode generateMethodSchema(MethodInfo methodInfo, @Nullable ObjectNode definitions) {
+    private ObjectNode generateMethodSchema(MethodInfo methodInfo, ObjectNode definitions) {
         final ObjectNode root = mapper.createObjectNode();
         root.put("$id", methodInfo.id());
         root.put("title", methodInfo.name());
         final String docString = methodInfo.descriptionInfo().docString();
-        if (docString != null && !docString.isEmpty()) {
+        if (!docString.isEmpty()) {
             root.put("description", docString);
         }
         root.put("additionalProperties", false);
         root.put("type", "object");
 
-        if (!methodInfo.useParameterAsRoot()) {
-            // REST
-            final ObjectNode propertiesNode = mapper.createObjectNode();
-            final ArrayNode requiredNode = mapper.createArrayNode();
+        final ObjectNode propertiesNode = mapper.createObjectNode();
+        final ArrayNode requiredNode = mapper.createArrayNode();
 
-            for (final FieldInfo field : methodInfo.parameters()) {
-                propertiesNode.set(field.name(), generateFieldSchema(field, /*useDefinitions=*/true));
-                if (field.requirement() == FieldRequirement.REQUIRED) {
-                    requiredNode.add(field.name());
-                }
+        for (final FieldInfo field : methodInfo.parameters()) {
+
+            propertiesNode.set(field.name(), generateFieldSchema(field));
+            if (field.requirement() == FieldRequirement.REQUIRED) {
+                requiredNode.add(field.name());
             }
-            if (propertiesNode.size() > 0) {
-                root.set("properties", propertiesNode);
-            }
-            if (requiredNode.size() > 0) {
-                root.set("required", requiredNode);
-            }
-            root.set("definitions", definitions); // definitions 필수
-            return root;
         }
 
-        // gRPC
-        final Map<TypeSignature, String> visited = new HashMap<>();
-        final FieldInfo firstParam = methodInfo.parameters().get(0);
-        final StructInfo structInfo = structs.get(firstParam.typeSignature().signature());
-
-        if (structInfo != null) {
-            visited.put(firstParam.typeSignature(), "#");
-            generateProperties(structInfo.fields(), visited, "#", root);
+        if (!propertiesNode.isEmpty()) {
+            root.set("properties", propertiesNode);
         }
+        if (!requiredNode.isEmpty()) {
+            root.set("required", requiredNode);
+        }
+
+        root.set("definitions", definitions);
         return root;
     }
 
-    private ObjectNode generateFieldSchema(FieldInfo field, boolean useDefinitions) {
+    private ObjectNode generateFieldSchema(FieldInfo field) {
         final ObjectNode fieldNode = mapper.createObjectNode();
         final TypeSignature typeSignature = field.typeSignature();
         final String docString = field.descriptionInfo().docString();
-        if (docString != null && !docString.isEmpty()) {
+        if (!docString.isEmpty()) {
             fieldNode.put("description", docString);
         }
 
-        if (useDefinitions) {
-            // REST: STRUCT/ENUM은 $ref (기존 기대와 호환)
-            if (typeSignature.type() == TypeSignatureType.STRUCT ||
-                typeSignature.type() == TypeSignatureType.ENUM) {
-                fieldNode.put("$ref", "#/definitions/" + typeSignature.name());
-                return fieldNode;
-            }
+        if (typeSignature.type() == TypeSignatureType.STRUCT ||
+            typeSignature.type() == TypeSignatureType.ENUM) {
+            fieldNode.put("$ref", "#/definitions/" + typeSignature.name());
+            return fieldNode;
         }
 
-        // gRPC (inline) 또는 나머지 타입
         final String schemaType = getSchemaType(typeSignature);
         fieldNode.put("type", schemaType);
 
         switch (typeSignature.type()) {
             case ENUM:
-                // gRPC (inline)에서만 여기 타는데, enum 값 인라인
                 final EnumInfo enumInfo = enums.get(typeSignature.name());
                 if (enumInfo != null) {
                     final ArrayNode enumValues = mapper.createArrayNode();
@@ -287,16 +254,15 @@ final class JsonSchemaGenerator {
             case ITERABLE:
                 final TypeSignature itemType =
                         ((ContainerTypeSignature) typeSignature).typeParameters().get(0);
-                fieldNode.set("items", generateFieldSchema(FieldInfo.of("", itemType), useDefinitions));
+                fieldNode.set("items", generateFieldSchema(FieldInfo.of("", itemType)));
                 break;
             case MAP:
                 final TypeSignature valueType =
                         ((MapTypeSignature) typeSignature).valueTypeSignature();
                 fieldNode.set("additionalProperties",
-                              generateFieldSchema(FieldInfo.of("", valueType), useDefinitions));
+                              generateFieldSchema(FieldInfo.of("", valueType)));
                 break;
             default:
-                // BASE/STRUCT(여기 올 일 없음)/UNRESOLVED 등은 type만으로 처리
         }
         return fieldNode;
     }
@@ -310,10 +276,10 @@ final class JsonSchemaGenerator {
             generateFieldSchemaInline(field, visited, path + "/properties", propertiesNode, requiredNode);
         }
 
-        if (propertiesNode.size() > 0) {
+        if (!propertiesNode.isEmpty()) {
             parent.set("properties", propertiesNode);
         }
-        if (requiredNode.size() > 0) {
+        if (!requiredNode.isEmpty()) {
             parent.set("required", requiredNode);
         }
     }
@@ -323,7 +289,7 @@ final class JsonSchemaGenerator {
         final ObjectNode fieldNode = mapper.createObjectNode();
         final TypeSignature typeSignature = field.typeSignature();
         final String docString = field.descriptionInfo().docString();
-        if (docString != null && !docString.isEmpty()) {
+        if (!docString.isEmpty()) {
             fieldNode.put("description", docString);
         }
 
@@ -341,7 +307,7 @@ final class JsonSchemaGenerator {
         final String schemaType = getSchemaType(typeSignature);
         fieldNode.put("type", schemaType);
 
-        if (ImmutableSet.of("object", "array").contains(schemaType)) {
+        if ("object".equals(schemaType) || "array".equals(schemaType)) {
             visited.put(typeSignature, currentPath);
         }
 
